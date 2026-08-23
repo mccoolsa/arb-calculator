@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# your own bet history stays local
+saved_bets.json
+*.bak
+
+# PyInstaller / packaging output
+build/
+dist/
+*.spec
