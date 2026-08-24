@@ -1003,14 +1003,14 @@ class ManualBetDialog(tk.Toplevel):
                  bg=T.CARD, fg=T.TEXT, font=T.FONT_H2, anchor="w").pack(fill="x")
         tk.Label(body,
                  text="Any bet at all — a single, an each-way, a bet a mate "
-                      "offered you. Only the name is required; leave the rest "
-                      "blank if it does not apply.",
+                      "offered you. Only the selection is required; leave the "
+                      "rest blank if it does not apply.",
                  bg=T.CARD, fg=T.MUTED, font=T.FONT_SM, anchor="w",
                  justify="left", wraplength=520).pack(fill="x", pady=(4, 16))
 
         self.vars = {
-            "name": tk.StringVar(value=initial.get("name", "")),
-            "selection": tk.StringVar(value=initial.get("selection", "")),
+            "name": tk.StringVar(
+                value=initial.get("selection") or initial.get("name", "")),
             "event": tk.StringVar(value=initial.get("event", "")),
             "bookmaker": tk.StringVar(value=initial.get("bookmaker", "")),
             "odds": tk.StringVar(value=initial.get("odds", "")),
@@ -1058,20 +1058,19 @@ class ManualBetDialog(tk.Toplevel):
             self.choices[key] = control
             return control
 
-        self.name_entry = field(0, 0, "Name *", "name")
+        self.name_entry = field(0, 0, "Selection *", "name")
         field(0, 2, "Date", "date")
-        field(1, 0, "Selection", "selection")
-        field(1, 2, "Event", "event")
+        field(1, 0, "Event", "event")
+        field(1, 2, "Bookmaker", "bookmaker")
         choice(2, 0, "Sport", "sport", betlog.SPORTS,
                initial.get("sport", ""))
         choice(2, 2, "Type", "bet_type", betlog.BET_TYPES,
                initial.get("bet_type",
                            "" if editing else betlog.DEFAULT_BET_TYPE))
-        field(3, 0, "Bookmaker", "bookmaker")
-        field(3, 2, "Odds", "odds")
-        field(4, 0, "Stake", "stake")
-        field(4, 2, "Payout", "payout")
-        field(5, 0, "Notes", "notes")
+        field(3, 0, "Odds", "odds")
+        field(3, 2, "Stake", "stake")
+        field(4, 0, "Payout", "payout")
+        field(4, 2, "Notes", "notes")
 
         # Odds format + payout helper sit under the numeric fields.
         tools = tk.Frame(body, bg=T.CARD)
@@ -1142,7 +1141,7 @@ class ManualBetDialog(tk.Toplevel):
     def _ok(self):
         values = {k: v.get().strip() for k, v in self.vars.items()}
         if not values["name"]:
-            self.error.configure(text="Give the bet a name.")
+            self.error.configure(text="Give the bet a selection.")
             self.name_entry.focus_set()
             return
         for key in ("stake", "payout"):
