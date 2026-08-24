@@ -26,8 +26,8 @@ probability rather than the price the book is showing, otherwise you are only
 measuring the vig.
 
 **Bet Log** holds every calculation you have saved plus anything you type in by
-hand. A hand-entered bet does not need two sides, odds or a payout. The name is
-the only required field.
+hand. A hand-entered bet does not need two sides, odds or a payout. The
+selection is the only required field.
 
 You can tag a hand-entered bet with a sport (Soccer, GAA, Basketball, CS,
 Valorant, Horse Racing, Greyhounds, Darts, Golf, MMA/Boxing, Other) and a type
@@ -35,11 +35,11 @@ Valorant, Horse Racing, Greyhounds, Darts, Golf, MMA/Boxing, Other) and a type
 show in the log and both reach the CSV, so you can group a season by sport or
 compare accumulators against singles.
 
-The table identifies a row by its selection rather than its name, since the two
-say the same thing and the selection says it more concretely. A bet with no
-selection typed in falls back to its name, so no row is ever unlabelled. Name,
-Event, Bookmaker and the Arbitrage / Expected Value / Manual kind are all still
-in the CSV; the filter row above the table narrows by kind.
+A bet is identified by its selection, in the log and on the form. Earlier
+versions asked for a name as well, which was the same thing said twice; bets
+saved back then keep whichever label the log was already showing. Event,
+Bookmaker and the Arbitrage / Expected Value / Manual kind are all still in the
+CSV, and the filter row above the table narrows by kind.
 
 Mark a bet Pending, Won, Lost or Void and the P/L column follows. A loss costs
 you the stake, a void is a wash at zero, and a winner shows the payout less the
