@@ -339,6 +339,47 @@ def test_totals_for_one_winner_and_two_losers():
     assert approx(figures["roi_pct"], 26.4, tol=0.05)
 
 
+# -- filter option lists ---------------------------------------------------
+
+def test_sport_filter_options():
+    keys = [k for k, _ in betlog.SPORT_FILTERS]
+    labels = [lbl for _, lbl in betlog.SPORT_FILTERS]
+    assert keys[0] == "all" and labels[0] == "All sports"
+    assert keys[-1] == "none" and labels[-1] == "Not set"
+    # every real sport is offered, and the blank is not offered twice
+    assert [k for k in keys[1:-1]] == [s for s in betlog.SPORTS if s]
+    assert "" not in keys
+
+
+def test_totals_narrow_to_a_subset():
+    """The summary is computed from whatever rows are passed in."""
+    everything = [
+        {"name": "CS won", "kind": MANUAL, "status": "Won",
+         "created": "2026-08-24T10:00:00",
+         "inputs": {"sport": "CS", "stake": "40", "payout": "96"},
+         "results": betlog.manual_results("40", "96")},
+        {"name": "CS lost", "kind": MANUAL, "status": "Lost",
+         "created": "2026-08-24T10:00:00",
+         "inputs": {"sport": "CS", "stake": "25", "payout": ""},
+         "results": betlog.manual_results("25", "")},
+        {"name": "Golf won", "kind": MANUAL, "status": "Won",
+         "created": "2026-08-24T10:00:00",
+         "inputs": {"sport": "Golf", "stake": "10", "payout": "58"},
+         "results": betlog.manual_results("10", "58")},
+    ]
+    whole = betlog.totals(everything)
+    assert approx(whole["staked"], 75.00)
+    assert approx(whole["settled"], 79.00)      # 56 - 25 + 48
+
+    cs_only = [b for b in everything
+               if betlog.log_row(b)["Sport"] == "CS"]
+    figures = betlog.totals(cs_only)
+    assert figures["count"] == 2
+    assert approx(figures["staked"], 65.00)
+    assert approx(figures["settled"], 31.00)    # 56 - 25
+    assert approx(figures["roi_pct"], 47.69, tol=0.01)
+
+
 # -- date periods ----------------------------------------------------------
 
 def test_periods_select_the_right_windows():

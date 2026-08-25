@@ -1256,6 +1256,7 @@ class BetLogPanel(tk.Frame):
         self._markers = {}
         self._filter = "all"
         self._period = "all"
+        self._sport = "all"
         self._build()
         self.refresh()
 
@@ -1298,6 +1299,13 @@ class BetLogPanel(tk.Frame):
         self.period_control = W.Dropdown(filters, betlog.PERIODS,
                                          command=self._set_period, bg=T.CARD)
         self.period_control.pack(side="left")
+
+        tk.Label(filters, text="Sport", bg=T.CARD, fg=T.MUTED,
+                 font=T.FONT_SM).pack(side="left", padx=(20, 8))
+        self.sport_control = W.Dropdown(filters, betlog.SPORT_FILTERS,
+                                        command=self._set_sport, bg=T.CARD,
+                                        min_width=146)
+        self.sport_control.pack(side="left")
 
         header = tk.Frame(body, bg=T.CARD)
         header.pack(fill="x")
@@ -1365,10 +1373,32 @@ class BetLogPanel(tk.Frame):
         bets = self.store.all()
         if self._filter != "all":
             bets = [b for b in bets if b.get("kind") == self._filter]
+        if self._period == "all" and self._sport == "all":
+            return bets
+
+        wanted_sport = "" if self._sport == "none" else self._sport
+        kept = []
+        for bet in bets:
+            row = betlog.log_row(bet)
+            if self._period != "all" and not betlog.in_period(row["Date"],
+                                                              self._period):
+                continue
+            if self._sport != "all" and row["Sport"] != wanted_sport:
+                continue
+            kept.append(bet)
+        return kept
+
+    def _scope_note(self):
+        """Which filters are narrowing the view, for the export message."""
+        parts = []
+        if self._filter != "all":
+            parts.append(betlog.TYPE_LABELS.get(self._filter, self._filter))
+        if self._sport != "all":
+            parts.append("no sport set" if self._sport == "none"
+                         else self._sport)
         if self._period != "all":
-            bets = [b for b in bets
-                    if betlog.in_period(betlog.log_row(b)["Date"], self._period)]
-        return bets
+            parts.append(dict(betlog.PERIODS)[self._period])
+        return " ({})".format(", ".join(parts)) if parts else ""
 
     def _set_filter(self, key):
         self._filter = key
@@ -1376,6 +1406,10 @@ class BetLogPanel(tk.Frame):
 
     def _set_period(self, key):
         self._period = key
+        self.refresh()
+
+    def _set_sport(self, key):
+        self._sport = key
         self.refresh()
 
     def refresh(self, select=None):
@@ -1510,8 +1544,10 @@ class BetLogPanel(tk.Frame):
             values.pop("name"), MANUAL, values,
             betlog.manual_results(values.get("stake"), values.get("payout")),
             status=status)
-        self._filter = "all"
+        self._filter = self._period = self._sport = "all"
         self.filter_control.set("all")
+        self.period_control.set("all")
+        self.sport_control.set("all")
         self.refresh(select=bet["id"])
         self._on_status("Recorded “{}”".format(bet["name"]))
 
@@ -1592,10 +1628,8 @@ class BetLogPanel(tk.Frame):
         except OSError as exc:
             self._on_status("Export failed: {}".format(exc))
             return
-        scope = "" if self._filter == "all" else " ({} only)".format(
-            betlog.TYPE_LABELS.get(self._filter, self._filter))
         self._on_status("Exported {} bet{}{} to {}".format(
-            written, "" if written == 1 else "s", scope,
+            written, "" if written == 1 else "s", self._scope_note(),
             os.path.basename(path)))
 
 

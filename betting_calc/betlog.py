@@ -53,6 +53,12 @@ TABLE_COLUMNS = ("Date", "Sport", "Selection", "Bet Type",
 
 NUMERIC_COLUMNS = ("Stake", "Payout", "Projected P/L", "Realised P/L", "P/L")
 
+#: Options for the log's sport dropdown. "Not set" catches bets saved
+#: before the field existed, and calculated bets, which carry no sport.
+SPORT_FILTERS = ((("all", "All sports"),)
+                 + tuple((sport, sport) for sport in SPORTS if sport)
+                 + (("none", "Not set"),))
+
 #: Date windows offered by the log's period dropdown.
 PERIODS = (
     ("all", "All time"),

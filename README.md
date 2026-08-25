@@ -53,8 +53,10 @@ Mark a bet Pending, Won, Lost or Void and the P/L column follows. A loss costs
 you the stake, a void is a wash at zero, and a winner shows the payout less the
 stake. While a bet is still pending the column shows what it stands to make
 instead. The period dropdown narrows the log to today, the last 7 or 30 days,
-this month or this year, and the summary line above it re-totals to match, so
-you can see what you actually made over a stretch rather than only in total.
+this month or this year, and a sport dropdown beside it narrows to one sport,
+or to the bets with no sport recorded. The summary line above them re-totals to
+whatever is showing, so staked, settled and ROI all answer for that slice
+rather than the whole log. The CSV export follows the same filters.
 
 The whole thing exports to CSV.
 
