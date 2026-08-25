@@ -35,6 +35,14 @@ Valorant, Horse Racing, Greyhounds, Darts, Golf, MMA/Boxing, Other) and a type
 show in the log and both reach the CSV, so you can group a season by sport or
 compare accumulators against singles.
 
+Tick **Each way** and the stake splits in half, one half on the win and one on
+the place, with the place half running at whichever fraction of the odds you
+pick (1/2, 1/3, 1/4 or 1/5). A note under the box spells out the split and what
+comes back either way, so 10 on an 8/1 shot at a fifth reads: 5.00 win + 5.00
+place at 8/5, returning 58.00 if it wins and 13.00 if it places. Note the stake
+is the **total** outlay, so what a bookmaker calls "10 each way" is a stake of
+20 here.
+
 A bet is identified by its selection, in the log and on the form. Earlier
 versions asked for a name as well, which was the same thing said twice; bets
 saved back then keep whichever label the log was already showing. Event,

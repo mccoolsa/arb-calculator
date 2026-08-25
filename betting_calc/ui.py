@@ -1022,6 +1022,7 @@ class ManualBetDialog(tk.Toplevel):
         self.odds_format = initial.get("odds_format", core.DECIMAL)
         self.status = initial.get("status", DEFAULT_STATUS)
         self.choices = {}
+        self.each_way = tk.BooleanVar(value=bool(initial.get("each_way")))
 
         grid = tk.Frame(body, bg=T.CARD)
         grid.pack(fill="x")
@@ -1069,8 +1070,43 @@ class ManualBetDialog(tk.Toplevel):
                            "" if editing else betlog.DEFAULT_BET_TYPE))
         field(3, 0, "Odds", "odds")
         field(3, 2, "Stake", "stake")
-        field(4, 0, "Payout", "payout")
-        field(4, 2, "Notes", "notes")
+
+        tk.Label(grid, text="Each way", bg=T.CARD, fg=T.TEXT_DIM,
+                 font=T.FONT_SM, anchor="w").grid(
+                     row=4, column=0, sticky="w", padx=(0, 12), pady=6)
+        each_way_row = tk.Frame(grid, bg=T.CARD)
+        each_way_row.grid(row=4, column=1, columnspan=3, sticky="ew", pady=6)
+        W.CheckBox(each_way_row, "Split the stake half win, half place",
+                   self.each_way, command=self._toggle_each_way,
+                   bg=T.CARD).pack(side="left")
+
+        # The terms only mean anything once the box is ticked, so they stay
+        # out of the way until then.
+        self.terms_row = tk.Frame(each_way_row, bg=T.CARD)
+        tk.Label(self.terms_row, text="at", bg=T.CARD, fg=T.MUTED,
+                 font=T.FONT_SM).pack(side="left", padx=(16, 8))
+        self.terms = W.Dropdown(
+            self.terms_row, [(t, t) for t in betlog.PLACE_TERMS],
+            command=lambda _k: self._refresh_each_way(), bg=T.CARD,
+            min_width=76)
+        self.terms.set(initial.get("place_terms") or betlog.DEFAULT_PLACE_TERMS)
+        self.terms.pack(side="left")
+        tk.Label(self.terms_row, text="of the odds", bg=T.CARD, fg=T.MUTED,
+                 font=T.FONT_SM).pack(side="left", padx=(8, 0))
+
+        self.each_way_note = tk.Label(grid, text="", bg=T.CARD, fg=T.ACCENT,
+                                      font=T.FONT_SM, anchor="w",
+                                      justify="left")
+        self.each_way_note.grid(row=5, column=1, columnspan=3, sticky="w")
+
+        field(6, 0, "Payout", "payout")
+        field(6, 2, "Notes", "notes")
+
+        # keep the note in step with whatever is typed above it
+        for key in ("odds", "stake"):
+            self.vars[key].trace_add("write",
+                                     lambda *_: self._refresh_each_way())
+        self._toggle_each_way()
 
         # Odds format + payout helper sit under the numeric fields.
         tools = tk.Frame(body, bg=T.CARD)
@@ -1122,16 +1158,46 @@ class ManualBetDialog(tk.Toplevel):
         self.grab_set()
         self.wait_window(self)
 
+    def _toggle_each_way(self):
+        if self.each_way.get():
+            self.terms_row.pack(side="left")
+        else:
+            self.terms_row.pack_forget()
+        self._refresh_each_way()
+
+    def _refresh_each_way(self):
+        """Say what the split comes to, so the numbers are not a mystery."""
+        if not self.each_way.get():
+            self.each_way_note.configure(text="")
+            return
+        split = betlog.each_way_breakdown(
+            self.vars["odds"].get(), self.vars["stake"].get(),
+            self.odds_format, self.terms.get())
+        if split is None:
+            self.each_way_note.configure(
+                text="Enter odds and a stake to see the split.", fg=T.FAINT)
+            return
+        self.each_way_note.configure(
+            text="{} win + {} place at {}  ·  returns {} if it wins, "
+                 "{} if it places".format(
+                     core.money(split.win_stake), core.money(split.place_stake),
+                     core.decimal_to_fractional(split.place_odds),
+                     core.money(split.win_return),
+                     core.money(split.place_return)),
+            fg=T.ACCENT)
+
     def _set_format(self, fmt):
         self.odds_format = fmt
+        self._refresh_each_way()
 
     def _set_status(self, status):
         self.status = status
 
     def _fill_payout(self):
-        payout = betlog.suggested_payout(self.vars["odds"].get(),
-                                         self.vars["stake"].get(),
-                                         self.odds_format)
+        payout = betlog.suggested_payout(
+            self.vars["odds"].get(), self.vars["stake"].get(),
+            self.odds_format, each_way=self.each_way.get(),
+            place_terms=self.terms.get())
         if payout is None:
             self.error.configure(text="Enter valid odds and a stake first.")
             return
@@ -1156,6 +1222,8 @@ class ManualBetDialog(tk.Toplevel):
             return
         values.update({k: c.get() for k, c in self.choices.items()})
         values["odds_format"] = self.odds_format
+        values["each_way"] = bool(self.each_way.get())
+        values["place_terms"] = self.terms.get() if self.each_way.get() else ""
         values["status"] = self.status
         self.result = values
         self.destroy()

@@ -229,6 +229,82 @@ def implied_probability(decimal_odds: float) -> float:
 # Arbitrage / hedge
 # --------------------------------------------------------------------------
 
+#: Each-way place terms: the fraction of the odds the place part runs at.
+PLACE_FRACTIONS = {"1/2": 0.5, "1/3": 1.0 / 3.0, "1/4": 0.25, "1/5": 0.2}
+
+
+def parse_place_terms(raw) -> float:
+    """'1/5' -> 0.2. Any 'n/d' is accepted, not just the usual four."""
+    text = str(raw or "").strip().replace(" ", "")
+    if text in PLACE_FRACTIONS:
+        return PLACE_FRACTIONS[text]
+    numerator, separator, denominator = text.partition("/")
+    if not separator:
+        raise OddsError("Place terms look like 1/5.")
+    try:
+        top, bottom = float(numerator), float(denominator)
+    except ValueError:
+        raise OddsError("Place terms look like 1/5.") from None
+    if top <= 0 or bottom <= 0:
+        raise OddsError("Place terms must be positive, like 1/5.")
+    return top / bottom
+
+
+@dataclass(frozen=True)
+class EachWayResult:
+    stake: float                # the whole outlay
+    win_stake: float            # half of it, on the win
+    place_stake: float          # the other half, on the place
+    odds: float
+    place_odds: float
+    place_fraction: float
+    win_return: float           # back if it wins - both halves pay
+    place_return: float         # back if it only places
+    win_profit: float
+    place_profit: float
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+def compute_each_way(stake: float, decimal_odds: float,
+                     place_fraction: float) -> EachWayResult:
+    """An each-way bet with the stake split half win, half place.
+
+    The place half runs at a fraction of the odds, so 8/1 at 1/5 terms
+    places at 8/5. Winning pays both halves; placing pays only the second;
+    finishing out of the places pays nothing.
+
+    Note this treats ``stake`` as the *total* outlay. A bookmaker writing
+    "10 each way" means 10 on each half and 20 out of your pocket, so 10
+    each way in their sense is a stake of 20 here.
+    """
+    if decimal_odds <= 1.0:
+        raise OddsError("Decimal odds must be greater than 1.00.")
+    if stake < 0:
+        raise OddsError("Stake must be positive.")
+    if not 0 < place_fraction <= 1:
+        raise OddsError("Place terms must be a fraction such as 1/5.")
+
+    half = stake / 2.0
+    place_odds = 1.0 + (decimal_odds - 1.0) * place_fraction
+    win_return = half * decimal_odds + half * place_odds
+    place_return = half * place_odds
+
+    return EachWayResult(
+        stake=stake,
+        win_stake=half,
+        place_stake=half,
+        odds=decimal_odds,
+        place_odds=place_odds,
+        place_fraction=place_fraction,
+        win_return=win_return,
+        place_return=place_return,
+        win_profit=win_return - stake,
+        place_profit=place_return - stake,
+    )
+
+
 def hedge_stake(stake: float, odds_from: float, odds_to: float) -> float:
     """Stake on the other side that makes both payouts equal.
 

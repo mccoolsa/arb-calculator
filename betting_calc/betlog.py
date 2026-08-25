@@ -4,8 +4,9 @@ An arbitrage, an expected-value wager and a bet typed in by hand describe
 very different positions, but a log is only useful if every row answers the
 same questions. Each kind is therefore mapped onto one set of columns:
 
-    Date, Name, Type, Sport, Selection, Bet Type, Event, Bookmaker, Odds,
-    Stake, Payout, Projected P/L, Realised P/L, Status, Notes
+    Date, Name, Type, Sport, Selection, Bet Type, Each Way, Event,
+    Bookmaker, Odds, Stake, Payout, Projected P/L, Realised P/L, Status,
+    Notes
 
 The numeric columns stay as numbers (never "$1,234.56") so the exported CSV
 opens cleanly in Excel or Power BI without a parsing pass.
@@ -31,18 +32,22 @@ SPORTS = ("", "Soccer", "GAA", "Basketball", "CS", "Valorant", "Horse Racing",
 BET_TYPES = ("", "Single", "Double", "Treble", "Accum")
 DEFAULT_BET_TYPE = "Single"
 
+#: Each-way place terms, offered when the each-way box is ticked. A fifth
+#: of the odds is much the commonest, so that is what a new bet starts on.
+PLACE_TERMS = ("1/2", "1/3", "1/4", "1/5")
+DEFAULT_PLACE_TERMS = "1/5"
+
 CSV_COLUMNS = ("Date", "Name", "Type", "Sport", "Selection", "Bet Type",
-               "Event", "Bookmaker", "Odds", "Stake", "Payout",
+               "Each Way", "Event", "Bookmaker", "Odds", "Stake", "Payout",
                "Projected P/L", "Realised P/L", "Status", "Notes")
 
 #: "P/L" is a display-only column: the realised figure once a bet is settled,
 #: the projection while it is still running. The export keeps the two apart.
 ALL_KEYS = CSV_COLUMNS + ("P/L",)
 
-#: Columns worth showing on screen; the rest are export-only.
-#: Export-only columns carry what the table has no room for. "Type"
-#: duplicates the filter row above the table, and "Name" duplicates
-#: "Selection", which says the same thing more concretely.
+#: Columns worth showing on screen. The rest are export-only: "Type"
+#: duplicates the filter row above the table, "Name" duplicates
+#: "Selection", and the each-way terms ride along on "Bet Type".
 TABLE_COLUMNS = ("Date", "Sport", "Selection", "Bet Type",
                  "Odds", "Stake", "Payout", "P/L", "Status")
 
@@ -155,7 +160,12 @@ def log_row(bet: dict) -> dict:
     else:
         row["Selection"] = inputs.get("selection", "") or name
         row["Sport"] = inputs.get("sport", "") or ""
-        row["Bet Type"] = inputs.get("bet_type", "") or ""
+        bet_type = inputs.get("bet_type", "") or ""
+        if inputs.get("each_way"):
+            row["Each Way"] = inputs.get("place_terms", "") or ""
+            # The table has no room for its own column, so say it here.
+            bet_type = (bet_type + " e/w").strip()
+        row["Bet Type"] = bet_type
         row["Event"] = inputs.get("event", "") or ""
         row["Bookmaker"] = inputs.get("bookmaker", "") or ""
         row["Stake"] = _number(inputs.get("stake"))
@@ -165,9 +175,11 @@ def log_row(bet: dict) -> dict:
             # stake imply. A winner still reports what it made, and typing a
             # payout in overrides this for boosts, each-way or partial
             # cash-outs.
-            payout = suggested_payout(inputs.get("odds"),
-                                      inputs.get("stake"),
-                                      inputs.get("odds_format", core.DECIMAL))
+            payout = suggested_payout(
+                inputs.get("odds"), inputs.get("stake"),
+                inputs.get("odds_format", core.DECIMAL),
+                each_way=bool(inputs.get("each_way")),
+                place_terms=inputs.get("place_terms"))
         row["Payout"] = payout
         # Recomputed rather than read back from storage, so editing the odds
         # updates the projection instead of leaving a stale figure.
@@ -220,16 +232,40 @@ def manual_results(stake, payout) -> dict:
             "projected_profit": profit}
 
 
-def suggested_payout(odds_text, stake, odds_format=core.DECIMAL):
-    """stake x odds, for pre-filling the payout box. None if not derivable."""
+def suggested_payout(odds_text, stake, odds_format=core.DECIMAL,
+                     each_way=False, place_terms=None):
+    """What the bet returns if it wins. None if it cannot be worked out.
+
+    For an each-way bet that is both halves paying out, since a winner
+    places as well.
+    """
     stake_value = _number(stake)
     if stake_value is None:
         return None
     try:
         decimal_odds = core.parse_odds_loose(odds_text, odds_format)
+        if each_way:
+            fraction = core.parse_place_terms(
+                place_terms or DEFAULT_PLACE_TERMS)
+            return core.compute_each_way(
+                stake_value, decimal_odds, fraction).win_return
     except core.OddsError:
         return None
     return stake_value * decimal_odds
+
+
+def each_way_breakdown(odds_text, stake, odds_format=core.DECIMAL,
+                       place_terms=None):
+    """The split and both returns, for the note under the each-way box."""
+    stake_value = _number(stake)
+    if stake_value is None:
+        return None
+    try:
+        decimal_odds = core.parse_odds_loose(odds_text, odds_format)
+        fraction = core.parse_place_terms(place_terms or DEFAULT_PLACE_TERMS)
+        return core.compute_each_way(stake_value, decimal_odds, fraction)
+    except core.OddsError:
+        return None
 
 
 def totals(bets) -> dict:

@@ -235,6 +235,59 @@ def test_derived_payout_follows_the_bets_odds_format():
         assert approx(row["Payout"], 34.55, tol=0.05), (fmt, row["Payout"])
 
 
+def test_each_way_payout_covers_both_halves():
+    bet = {"name": "Outsider", "kind": MANUAL, "status": "Won",
+           "created": "2026-08-24T10:00:00",
+           "inputs": {"odds": "8/1", "stake": "10", "payout": "",
+                      "odds_format": core.FRACTIONAL, "bet_type": "Single",
+                      "each_way": True, "place_terms": "1/5"},
+           "results": betlog.manual_results("10", "")}
+    row = betlog.log_row(bet)
+    assert approx(row["Payout"], 58.00)          # 5x9 + 5x2.6
+    assert approx(row["P/L"], 48.00)
+    assert row["Each Way"] == "1/5"
+    assert row["Bet Type"] == "Single e/w"       # the table has no e/w column
+
+
+def test_each_way_terms_change_the_payout():
+    def payout(terms):
+        return betlog.suggested_payout("8/1", "10", core.FRACTIONAL,
+                                       each_way=True, place_terms=terms)
+    assert approx(payout("1/5"), 58.00)
+    assert approx(payout("1/4"), 60.00)
+    assert approx(payout("1/2"), 70.00)
+    # unticked, the whole stake rides on the win
+    assert approx(betlog.suggested_payout("8/1", "10", core.FRACTIONAL), 90.00)
+
+
+def test_a_placed_only_return_can_be_typed_over_the_top():
+    """The log has no Placed status, so record the actual return."""
+    bet = {"name": "Outsider", "kind": MANUAL, "status": "Won",
+           "created": "2026-08-24T10:00:00",
+           "inputs": {"odds": "8/1", "stake": "10", "payout": "13",
+                      "odds_format": core.FRACTIONAL,
+                      "each_way": True, "place_terms": "1/5"},
+           "results": betlog.manual_results("10", "13")}
+    row = betlog.log_row(bet)
+    assert approx(row["Payout"], 13.00)          # not the 58.00 it would derive
+    assert approx(row["P/L"], 3.00)
+
+
+def test_each_way_breakdown_feeds_the_form_note():
+    split = betlog.each_way_breakdown("8/1", "10", core.FRACTIONAL, "1/5")
+    assert approx(split.win_stake, 5.00)
+    assert approx(split.win_return, 58.00)
+    assert approx(split.place_return, 13.00)
+    assert betlog.each_way_breakdown("", "10", core.FRACTIONAL, "1/5") is None
+    assert betlog.each_way_breakdown("8/1", "", core.FRACTIONAL, "1/5") is None
+
+
+def test_a_bet_that_is_not_each_way_is_unaffected():
+    row = betlog.log_row(_manual("Won", odds="8/1", stake="10"))
+    assert approx(row["Payout"], 90.00)
+    assert row["Each Way"] == ""
+
+
 def test_realised_pl_rules():
     assert betlog.realised_pl(40.0, 96.0, "Won") == 56.0
     assert betlog.realised_pl(25.0, None, "Lost") == -25.0

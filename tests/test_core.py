@@ -142,6 +142,67 @@ def test_parse_odds_dispatches_on_format():
         assert approx(core.parse_odds(text, fmt), 2.10)
 
 
+# -- each way -------------------------------------------------------------
+
+def test_place_terms_parse():
+    assert approx(core.parse_place_terms("1/2"), 0.5)
+    assert approx(core.parse_place_terms("1/3"), 0.33333)
+    assert approx(core.parse_place_terms("1/4"), 0.25)
+    assert approx(core.parse_place_terms("1/5"), 0.2)
+    assert approx(core.parse_place_terms("1 / 6"), 0.16667)   # not just the four
+    for bad in ("", "abc", "1/0", "0/5", "5"):
+        try:
+            core.parse_place_terms(bad)
+        except core.OddsError:
+            pass
+        else:
+            raise AssertionError("expected OddsError for {!r}".format(bad))
+
+
+def test_each_way_splits_the_stake_in_half():
+    """10 at 8/1 with 1/5 terms: 5 on the win, 5 on the place at 8/5."""
+    r = core.compute_each_way(10.0, core.parse_fractional("8/1"), 0.2)
+    assert approx(r.win_stake, 5.00) and approx(r.place_stake, 5.00)
+    assert approx(r.place_odds, 2.60)                # 1 + 8 x 1/5 = 8/5
+    assert approx(r.win_return, 58.00)               # 5x9 + 5x2.6
+    assert approx(r.place_return, 13.00)             # 5x2.6
+    assert approx(r.win_profit, 48.00)
+    assert approx(r.place_profit, 3.00)              # still ahead on a place
+
+
+def test_each_way_matches_the_bookmakers_own_arithmetic():
+    """A 20 stake here is what a book calls '10 each way'."""
+    r = core.compute_each_way(20.0, 9.0, 0.2)
+    assert approx(r.win_return, 10 * 9 + 10 * (1 + 8 * 0.2))
+    assert approx(r.place_return, 10 * (1 + 8 * 0.2))
+
+
+def test_place_terms_change_the_place_leg_only():
+    win_legs = []
+    for terms, expected_place_odds in (("1/2", 5.0), ("1/4", 3.0), ("1/5", 2.6)):
+        r = core.compute_each_way(10.0, 9.0, core.parse_place_terms(terms))
+        assert approx(r.place_odds, expected_place_odds)
+        win_legs.append(r.win_stake * r.odds)
+    assert len(set(round(w, 6) for w in win_legs)) == 1   # win half untouched
+
+
+def test_a_short_priced_each_way_can_lose_on_a_place():
+    """At 2/1 with 1/5 terms, placing returns less than the outlay."""
+    r = core.compute_each_way(10.0, 3.0, 0.2)
+    assert approx(r.place_return, 7.00)              # 5 x 1.4
+    assert r.place_profit < 0
+
+
+def test_each_way_rejects_impossible_terms():
+    for fraction in (0, -0.2, 1.5):
+        try:
+            core.compute_each_way(10.0, 3.0, fraction)
+        except core.OddsError:
+            pass
+        else:
+            raise AssertionError("expected OddsError for {}".format(fraction))
+
+
 # -- arbitrage: odds 1.80 / 3.70, stake 100 --------------------------------
 
 def test_arbitrage_reference_example():
